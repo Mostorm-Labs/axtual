@@ -35,6 +35,8 @@ if(AXTUAL_BUILD_TESTS)
         accepted_request_does_not_imply_applied_or_effective
         observed_mismatch_does_not_become_desired_truth
         stale_desired_revision_completion_rejected
+        stale_worker_generation_completion_rejected
+        stale_source_generation_completion_rejected
         stale_worker_generation_payload_rejected
         stale_source_connection_generation_payload_rejected
         mute_intent_survives_worker_restart_before_live_enable

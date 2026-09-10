@@ -1,6 +1,7 @@
 #include "axtual/common.hpp"
 
 #include <exception>
+#include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <fstream>
@@ -50,6 +51,20 @@ std::vector<TestCase> testCases() {
              identities.advanceDesiredRevision();
              require(!identities.acceptsCompletion(stale),
                      "superseded desired revision must be rejected");
+         }},
+        {"stale_worker_generation_completion_rejected", [] {
+             axtual::IdentityGate identities;
+             const auto stale = identities.currentWorkIdentity();
+             identities.restartWorker();
+             require(!identities.acceptsCompletion(stale),
+                     "completion from prior worker generation must be rejected");
+         }},
+        {"stale_source_generation_completion_rejected", [] {
+             axtual::IdentityGate identities;
+             const auto stale = identities.currentWorkIdentity();
+             identities.reconnectSource();
+             require(!identities.acceptsCompletion(stale),
+                     "completion from prior source generation must be rejected");
          }},
         {"stale_worker_generation_payload_rejected", [] {
              axtual::IdentityGate identities;
@@ -146,9 +161,17 @@ std::vector<TestCase> testCases() {
          }},
         {"permission_denied_remains_truthful_unavailable_without_fallback", [] {
              axtual::SourceBinding source(axtual::SourceKind::kAudio);
-             source.reconnectAmbiguous();
+             source.bind("mic-1");
+             source.denyPermission();
+             require(source.fault() == axtual::SourceFault::kPermissionDenied,
+                     "permission denial must be represented as a distinct fault");
              require(!source.available() && !source.fallbackSelected(),
-                     "permission denial model must not fallback");
+                     "permission denial must remain unavailable without fallback");
+             source.revokePermission();
+             require(source.fault() == axtual::SourceFault::kPermissionRevoked,
+                     "permission revocation must be represented as a distinct fault");
+             require(!source.available() && !source.fallbackSelected(),
+                     "permission revocation must remain unavailable without fallback");
          }},
         {"busy_ownership_conflict_does_not_create_second_owner", [] {
              axtual::MemorySafetyStore store;
@@ -157,9 +180,13 @@ std::vector<TestCase> testCases() {
              source.bind("mic-1");
              axtual::DemandCoordinator demand;
              require(demand.acquire(latch, source), "first owner should acquire");
-             require(demand.acquire(latch, source) && demand.demandCount() == 2,
-                     "additional demand shares the single modeled owner");
-             require(demand.ownsCapture(), "busy conflict must not create second owner");
+             source.markBusy();
+             require(demand.acquireResult(latch, source) == axtual::DemandResult::kContended,
+                     "busy source must report an ownership contention result");
+             require(demand.demandCount() == 1 && demand.ownsCapture(),
+                     "busy conflict must not create second owner");
+             require(source.fault() == axtual::SourceFault::kBusy,
+                     "busy fault must remain truthful");
          }},
         {"audio_worker_failure_leaves_video_domain_independently_operable", [] {
              axtual::ProcessorGuard audio(true);
@@ -200,6 +227,57 @@ std::vector<TestCase> testCases() {
     };
 }
 
+std::string executionEnvironment() {
+    if (const char* runnerOs = std::getenv("RUNNER_OS"); runnerOs != nullptr) {
+        return std::string(runnerOs) + ":github-actions";
+    }
+#if defined(_WIN32)
+    return "Windows:developer-host";
+#elif defined(__APPLE__)
+    return "macOS:developer-host";
+#elif defined(__linux__)
+    return "Linux:developer-host";
+#else
+    return "Unknown:developer-host";
+#endif
+}
+
+std::string oracleFor(std::string_view name) {
+    if (name.find("latch") != std::string_view::npos || name.find("intent") != std::string_view::npos ||
+        name.find("safety") != std::string_view::npos) {
+        return "O-LATCH";
+    }
+    if (name.find("generation") != std::string_view::npos || name.find("stale") != std::string_view::npos ||
+        name.find("transport_loss") != std::string_view::npos) {
+        return "O-GEN";
+    }
+    if (name.find("audio_source") != std::string_view::npos || name.find("permission") != std::string_view::npos) {
+        return "O-NOFALLBACK-A";
+    }
+    if (name.find("video_source") != std::string_view::npos) {
+        return "O-NOFALLBACK-V";
+    }
+    if (name.find("observed") != std::string_view::npos || name.find("accepted") != std::string_view::npos) {
+        return "O-TRUTH/O-STATE";
+    }
+    if (name.find("ambiguous") != std::string_view::npos) {
+        return "O-IDENTITY";
+    }
+    if (name.find("demand") != std::string_view::npos) {
+        return "O-ORDER/O-IDLE";
+    }
+    if (name.find("bounded") != std::string_view::npos || name.find("retry") != std::string_view::npos) {
+        return "O-BOUNDED";
+    }
+    if (name.find("independently") != std::string_view::npos) {
+        return "O-INDEPENDENCE";
+    }
+    if (name.find("ownership") != std::string_view::npos) {
+        return "O-CAPTURE-OWNER";
+    }
+    return "O-STATE";
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -220,20 +298,35 @@ int main(int argc, char** argv) {
                  << "  \"authority_refs\": [\"P14-v0.4\", \"P15-v0.4\", \"P16-v0.4\", "
                     "\"P17-v0.4\", \"P18-v0.4\", \"P20-v0.2\", \"P30-v0.2\"],\n"
                  << "  \"build_identity\": \"" << AXTUAL_BUILD_IDENTITY << "\",\n"
-                 << "  \"platform_environment\": \"canonical-local\",\n"
+                 << "  \"platform_environment\": \"" << executionEnvironment() << "\",\n"
                  << "  \"execution_method\": \"I30-01-deterministic-conformance\",\n"
                  << "  \"oracle\": [\"O-LATCH\", \"O-GEN\", \"O-NOFALLBACK-A\", "
                     "\"O-NOFALLBACK-V\", \"O-TRUTH\", \"O-STATE\", \"O-IDENTITY\", "
                     "\"O-ORDER\", \"O-IDLE\", \"O-BOUNDED\", \"O-INDEPENDENCE\", "
                     "\"O-CAPTURE-OWNER\"],\n"
-                 << "  \"case_results\": [\n";
+                 << "  \"obligations\": [\n";
         const auto cases = testCases();
         for (std::size_t index = 0; index < cases.size(); ++index) {
-            evidence << "    {\"name\": \"" << cases[index].name
-                     << "\", \"result\": \"PASS\"}" << (index + 1 == cases.size() ? "\n" : ",\n");
+            evidence << "    {\"oracle\": \"" << oracleFor(cases[index].name)
+                     << "\", \"case\": \"" << cases[index].name << "\"}"
+                     << (index + 1 == cases.size() ? "\n" : ",\n");
         }
-        evidence << "  ],\n  \"result\": \"PASS\"\n}\n";
-        return evidence.good() ? 0 : 3;
+        evidence << "  ],\n  \"case_results\": [\n";
+        bool allPassed = true;
+        for (std::size_t index = 0; index < cases.size(); ++index) {
+            std::string result = "PASS";
+            try {
+                cases[index].run();
+            } catch (const std::exception&) {
+                result = "FAIL";
+                allPassed = false;
+            }
+            evidence << "    {\"name\": \"" << cases[index].name << "\", \"oracle\": \""
+                     << oracleFor(cases[index].name) << "\", \"result\": \"" << result << "\"}"
+                     << (index + 1 == cases.size() ? "\n" : ",\n");
+        }
+        evidence << "  ],\n  \"result\": \"" << (allPassed ? "PASS" : "FAIL") << "\"\n}\n";
+        return evidence.good() && allPassed ? 0 : 1;
     }
 
     for (const auto& test : testCases()) {

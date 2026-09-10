@@ -65,7 +65,7 @@ public:
     void reconnectSource() { ++_identity.sourceConnectionGeneration; }
 
     [[nodiscard]] bool acceptsCompletion(const GenerationIdentity& identity) const {
-        return identity.desiredRevision == _identity.desiredRevision;
+        return identity == _identity;
     }
 
     [[nodiscard]] bool acceptsPayload(const GenerationIdentity& identity) const {
@@ -140,6 +140,10 @@ private:
 
 enum class SourceKind { kAudio, kVideo };
 
+enum class SourceFault { kNone, kPermissionDenied, kPermissionRevoked, kBusy, kAmbiguous };
+
+enum class DemandResult { kAcquired, kUnavailable, kContended };
+
 class SourceBinding {
 public:
     explicit SourceBinding(SourceKind kind) : _kind(kind) {}
@@ -148,34 +152,67 @@ public:
         _id = std::move(id);
         _available = true;
         _ambiguous = false;
+        _fault = SourceFault::kNone;
     }
     void lose() { _available = false; }
+    void denyPermission() {
+        _available = false;
+        _ambiguous = false;
+        _fault = SourceFault::kPermissionDenied;
+    }
+    void revokePermission() {
+        _available = false;
+        _ambiguous = false;
+        _fault = SourceFault::kPermissionRevoked;
+    }
+    void markBusy() {
+        _available = false;
+        _ambiguous = false;
+        _fault = SourceFault::kBusy;
+    }
     void reconnectAmbiguous() {
         _available = false;
         _ambiguous = true;
+        _fault = SourceFault::kAmbiguous;
     }
 
     [[nodiscard]] bool bound() const { return _id.has_value() && !_ambiguous; }
     [[nodiscard]] bool available() const { return bound() && _available; }
     [[nodiscard]] bool fallbackSelected() const { return false; }
     [[nodiscard]] SourceKind kind() const { return _kind; }
+    [[nodiscard]] SourceFault fault() const { return _fault; }
 
 private:
     SourceKind _kind;
     std::optional<std::string> _id;
     bool _available = false;
     bool _ambiguous = false;
+    SourceFault _fault = SourceFault::kNone;
 };
 
 class DemandCoordinator {
 public:
-    bool acquire(const SafetyLatch& safety, const SourceBinding& source) {
-        if (!safety.muteIntent() || !safety.privacyIntent() || !source.available()) {
-            return false;
+    DemandResult acquireResult(const SafetyLatch& safety, const SourceBinding& source) {
+        if (source.fault() == SourceFault::kBusy) {
+            _lastResult = DemandResult::kContended;
+            return _lastResult;
         }
-        _demandCount++;
+        if (!safety.muteIntent() || !safety.privacyIntent() || !source.available()) {
+            _lastResult = DemandResult::kUnavailable;
+            return _lastResult;
+        }
+        if (_owner) {
+            _lastResult = DemandResult::kContended;
+            return _lastResult;
+        }
+        _demandCount = 1;
         _owner = true;
-        return true;
+        _lastResult = DemandResult::kAcquired;
+        return _lastResult;
+    }
+
+    bool acquire(const SafetyLatch& safety, const SourceBinding& source) {
+        return acquireResult(safety, source) == DemandResult::kAcquired;
     }
 
     void release() {
@@ -189,6 +226,7 @@ public:
 
     [[nodiscard]] std::size_t demandCount() const { return _demandCount; }
     [[nodiscard]] bool ownsCapture() const { return _owner; }
+    [[nodiscard]] DemandResult lastResult() const { return _lastResult; }
 
     bool acquireForVideo(const SafetyLatch& safety, const SourceBinding& source) {
         return acquire(safety, source);
@@ -197,6 +235,7 @@ public:
 private:
     std::size_t _demandCount = 0;
     bool _owner = false;
+    DemandResult _lastResult = DemandResult::kUnavailable;
 };
 
 template <typename T>
