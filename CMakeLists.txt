@@ -66,8 +66,13 @@ if(AXTUAL_BUILD_TESTS)
         DEPENDS axtual_conformance
         USES_TERMINAL)
 
-    add_executable(axtual_i30_02_conformance tests/i30_02_conformance.cpp)
+    add_executable(axtual_i30_02_conformance
+        tests/i30_02_main.cpp
+        tests/i30_02_cases_endpoint.cpp
+        tests/i30_02_cases_enhancement.cpp
+        tests/i30_02_cases_repairs.cpp)
     target_link_libraries(axtual_i30_02_conformance PRIVATE axtual_common)
+    target_include_directories(axtual_i30_02_conformance PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     target_compile_definitions(axtual_i30_02_conformance PRIVATE
         AXTUAL_BUILD_IDENTITY="${AXTUAL_BUILD_IDENTITY}"
         AXTUAL_TASK_ANCHOR="6e1340664c1d3769385a0b065e4e4103cade4364")
@@ -106,7 +111,12 @@ if(AXTUAL_BUILD_TESTS)
         healthcheck_output_loss_or_policy_block_does_not_mutate_audio_input
         binding_kind_mismatch_rejected_without_commit
         endpoint_identity_certainty_is_explicit
-        ambiguous_identity_does_not_autobind)
+        ambiguous_identity_does_not_autobind
+        desired_binding_commit_does_not_fabricate_effective_state
+        aggregate_snapshot_derives_selection_from_binding_store
+        aggregate_snapshot_derives_enhancement_from_owner
+        endpoint_has_no_duplicate_projection_truth
+        explicit_reconciliation_observation_is_required_for_effective_state)
     foreach(case_name IN LISTS AXTUAL_I30_02_CASES)
         add_test(NAME i30_02_${case_name} COMMAND axtual_i30_02_conformance --case ${case_name})
     endforeach()
