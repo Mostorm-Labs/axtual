@@ -16,6 +16,10 @@ The evidence target writes `build/evidence/ea-b01-i30-01.json` with the exact re
 when CMake configured the build. The harness is dependency-free C++20 and is intended to run on
 Linux, Windows, and macOS.
 
+For I30-02 semantic conformance, use `cmake --build build --config Debug --target i30_02_evidence`;
+it writes `build/evidence/ea-b01-i30-02.json` with the four frozen VO-END obligations and the
+independently executed endpoint/policy/enhancement/self-loop cases.
+
 ## Scope
 
 The common runtime models semantic truth, safety latches, explicit source binding, bounded queues,
@@ -27,4 +31,3 @@ public transport endpoints, and product policy are intentionally outside this sl
 Follow [`AGENTS.md`](AGENTS.md), which records the AXTP C++ style standard supplied for this
 repository: four spaces, 100 columns, K&R braces, lower-snake-case files, explicit ownership,
 controlled includes, and no platform dependencies in common public headers.
-
