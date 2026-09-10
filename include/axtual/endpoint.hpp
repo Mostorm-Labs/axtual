@@ -34,9 +34,6 @@ struct Endpoint {
     PolicyDisposition policy = PolicyDisposition::kEligible;
     std::string policyReason;
     std::uint64_t policyRevision = 0;
-    bool selected = false;
-    bool effective = false;
-    EnhancementState enhancement = EnhancementState::kNone;
     EndpointOrigin origin = EndpointOrigin::kPhysical;
     IdentityQuality identityQuality = IdentityQuality::kUnknown;
 };
