@@ -16,12 +16,12 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Debug --output-on-failure
       - name: Evidence
-        run: cmake --build build --config Debug --target i30_01_evidence
+        run: cmake --build build --config Debug --target i30_01_evidence i30_02_evidence
       - name: Upload EA-B01 evidence
         uses: actions/upload-artifact@v4
         with:
-          name: ea-b01-i30-01-linux
-          path: build/evidence/ea-b01-i30-01.json
+          name: ea-b01-i30-02-linux
+          path: build/evidence/ea-b01-i30-02.json
 
   common-build-test:
     strategy:
@@ -36,4 +36,3 @@ jobs:
         run: cmake --build build --config Debug
       - name: Test
         run: ctest --test-dir build -C Debug --output-on-failure
-

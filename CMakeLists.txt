@@ -65,4 +65,55 @@ if(AXTUAL_BUILD_TESTS)
         COMMAND axtual_conformance --evidence "${CMAKE_BINARY_DIR}/evidence/ea-b01-i30-01.json"
         DEPENDS axtual_conformance
         USES_TERMINAL)
+
+    add_executable(axtual_i30_02_conformance tests/i30_02_conformance.cpp)
+    target_link_libraries(axtual_i30_02_conformance PRIVATE axtual_common)
+    target_compile_definitions(axtual_i30_02_conformance PRIVATE
+        AXTUAL_BUILD_IDENTITY="${AXTUAL_BUILD_IDENTITY}"
+        AXTUAL_TASK_ANCHOR="6e1340664c1d3769385a0b065e4e4103cade4364")
+    if(MSVC)
+        target_compile_options(axtual_i30_02_conformance PRIVATE /W4 /WX)
+    else()
+        target_compile_options(axtual_i30_02_conformance PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    endif()
+    set(AXTUAL_I30_02_CASES
+        generic_inventory_keeps_non_nearity_endpoint
+        snapshot_keeps_truth_channels_distinct
+        policy_block_does_not_rewrite_generic_truth
+        blocked_selection_rejected_without_commit
+        hidden_endpoint_remains_selectable
+        recommended_does_not_auto_select
+        missing_endpoint_rejected_without_commit
+        unknown_capability_not_selectable
+        explicit_selection_uses_canonical_ref
+        metadata_change_does_not_mutate_binding
+        same_reconnect_preserves_binding_without_revision
+        replaced_reconnect_is_explicit
+        gone_reconnect_is_explicit
+        ambiguous_same_name_does_not_bind
+        gone_endpoint_keeps_desired_non_effective
+        enhancement_gain_does_not_change_binding
+        enhancement_loss_preserves_generic_applicability
+        enhancement_required_loss_policy_blocks_without_fallback
+        new_policy_block_stops_applicability_without_alternate
+        hidden_presentation_change_keeps_active_selection
+        nearity_virtual_mic_self_loop_rejected_before_open
+        nearity_virtual_camera_self_loop_rejected_before_open
+        third_party_virtual_endpoint_not_rejected_solely_for_virtual
+        inventory_policy_enhancement_do_not_acquire_demand
+        caller_paths_share_common_validator
+        healthcheck_output_binding_is_independent_from_audio_input
+        healthcheck_output_loss_or_policy_block_does_not_mutate_audio_input
+        binding_kind_mismatch_rejected_without_commit
+        endpoint_identity_certainty_is_explicit
+        ambiguous_identity_does_not_autobind)
+    foreach(case_name IN LISTS AXTUAL_I30_02_CASES)
+        add_test(NAME i30_02_${case_name} COMMAND axtual_i30_02_conformance --case ${case_name})
+    endforeach()
+
+    add_custom_target(i30_02_evidence
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/evidence"
+        COMMAND axtual_i30_02_conformance --evidence "${CMAKE_BINARY_DIR}/evidence/ea-b01-i30-02.json"
+        DEPENDS axtual_i30_02_conformance
+        USES_TERMINAL)
 endif()
