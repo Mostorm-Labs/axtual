@@ -14,6 +14,7 @@ enum class Capability { kUnknown, kSupported, kUnsupported };
 enum class PolicyDisposition { kEligible, kRecommended, kHiddenByDefault, kBlockedByPolicy };
 enum class EndpointOrigin { kPhysical, kThirdPartyVirtual, kNearityVirtual };
 enum class EnhancementState { kNone, kCandidate, kAssociated, kAmbiguous, kLost };
+enum class IdentityQuality { kUnknown, kStable, kAmbiguous };
 
 struct Endpoint {
     Endpoint(std::string endpointId, EndpointKind endpointKind, std::string display,
@@ -37,6 +38,7 @@ struct Endpoint {
     bool effective = false;
     EnhancementState enhancement = EnhancementState::kNone;
     EndpointOrigin origin = EndpointOrigin::kPhysical;
+    IdentityQuality identityQuality = IdentityQuality::kUnknown;
 };
 
 class EndpointRegistry {
@@ -69,6 +71,12 @@ enum class ReconnectOutcome { kSame, kReplaced, kAmbiguous, kGone };
 
 class Reconciler {
 public:
+    static ReconnectOutcome reconcile(const Endpoint& previous, const Endpoint& current) {
+        if (current.identityQuality == IdentityQuality::kAmbiguous) return ReconnectOutcome::kAmbiguous;
+        if (current.id.empty()) return ReconnectOutcome::kGone;
+        if (previous.id == current.id && current.identityQuality == IdentityQuality::kStable) return ReconnectOutcome::kSame;
+        return ReconnectOutcome::kReplaced;
+    }
     static ReconnectOutcome reconcile(const std::string& previousId, const std::string& currentId,
                                       const std::string& displayIdentity) {
         if (currentId.empty()) {

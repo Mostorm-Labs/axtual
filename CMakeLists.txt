@@ -101,7 +101,12 @@ if(AXTUAL_BUILD_TESTS)
         nearity_virtual_camera_self_loop_rejected_before_open
         third_party_virtual_endpoint_not_rejected_solely_for_virtual
         inventory_policy_enhancement_do_not_acquire_demand
-        caller_paths_share_common_validator)
+        caller_paths_share_common_validator
+        healthcheck_output_binding_is_independent_from_audio_input
+        healthcheck_output_loss_or_policy_block_does_not_mutate_audio_input
+        binding_kind_mismatch_rejected_without_commit
+        endpoint_identity_certainty_is_explicit
+        ambiguous_identity_does_not_autobind)
     foreach(case_name IN LISTS AXTUAL_I30_02_CASES)
         add_test(NAME i30_02_${case_name} COMMAND axtual_i30_02_conformance --case ${case_name})
     endforeach()

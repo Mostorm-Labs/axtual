@@ -141,6 +141,51 @@ std::vector<TestCase> cases() {
             axtual::BindingStore bindings; axtual::SelectionValidator validator; auto ui = validator.select(registry, bindings, "mic-1", axtual::BindingKind::kAudioInput, axtual::CallerIdentity::kUi); auto api = validator.select(registry, bindings, "mic-1", axtual::BindingKind::kAudioInput, axtual::CallerIdentity::kApi);
             require(!ui.accepted && !api.accepted && ui.reason == api.reason, "caller paths share validator");
         }},
+        {"healthcheck_output_binding_is_independent_from_audio_input", [] {
+            axtual::BindingStore bindings;
+            bindings.commit(axtual::BindingKind::kAudioInput, "mic-1");
+            bindings.commit(axtual::BindingKind::kHealthCheckAudioOutput, "speaker-1");
+            require(bindings.audioInput() == "mic-1" && bindings.healthCheckAudioOutput() == "speaker-1" &&
+                        bindings.audioInputRevision() == 1 && bindings.healthCheckOutputRevision() == 2,
+                    "health-check output must be an independent binding");
+        }},
+        {"healthcheck_output_loss_or_policy_block_does_not_mutate_audio_input", [] {
+            axtual::BindingStore bindings;
+            bindings.commit(axtual::BindingKind::kAudioInput, "mic-1");
+            bindings.commit(axtual::BindingKind::kHealthCheckAudioOutput, "speaker-1");
+            bindings.markGone("speaker-1");
+            bindings.blockByPolicy("speaker-1");
+            require(bindings.audioInput() == "mic-1" && bindings.healthCheckAudioOutput() == "speaker-1" &&
+                        bindings.effective(axtual::BindingKind::kAudioInput) &&
+                        !bindings.effective(axtual::BindingKind::kHealthCheckAudioOutput),
+                    "health-check loss must not mutate audio input");
+        }},
+        {"binding_kind_mismatch_rejected_without_commit", [] {
+            axtual::EndpointRegistry registry;
+            auto& endpoint = registry.add("mic-1", axtual::EndpointKind::kAudioInput, "Mic");
+            endpoint.capability = axtual::Capability::kSupported;
+            axtual::BindingStore bindings;
+            axtual::SelectionValidator validator;
+            auto result = validator.select(registry, bindings, "mic-1",
+                                           axtual::BindingKind::kVideoInput, axtual::CallerIdentity::kApi);
+            require(!result.accepted && result.reason == "binding_kind_mismatch" && bindings.revision() == 0,
+                    "binding kind mismatch must reject before commit");
+        }},
+        {"endpoint_identity_certainty_is_explicit", [] {
+            axtual::Endpoint endpoint{"mic-1", axtual::EndpointKind::kAudioInput, "Mic"};
+            require(endpoint.identityQuality == axtual::IdentityQuality::kUnknown,
+                    "identity certainty must be explicit");
+            endpoint.identityQuality = axtual::IdentityQuality::kStable;
+            require(endpoint.identityQuality == axtual::IdentityQuality::kStable,
+                    "stable identity certainty must be representable");
+        }},
+        {"ambiguous_identity_does_not_autobind", [] {
+            axtual::Endpoint previous{"mic-1", axtual::EndpointKind::kAudioInput, "Mic"};
+            axtual::Endpoint candidate{"mic-2", axtual::EndpointKind::kAudioInput, "Mic"};
+            candidate.identityQuality = axtual::IdentityQuality::kAmbiguous;
+            require(axtual::Reconciler::reconcile(previous, candidate) == axtual::ReconnectOutcome::kAmbiguous,
+                    "ambiguous identity must not autobind");
+        }},
     };
 }
 
