@@ -1,0 +1,39 @@
+name: I30-01 common conformance
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DAXTUAL_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --config Debug
+      - name: Test
+        run: ctest --test-dir build -C Debug --output-on-failure
+      - name: Evidence
+        run: cmake --build build --config Debug --target i30_01_evidence
+      - name: Upload EA-B01 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ea-b01-i30-01-linux
+          path: build/evidence/ea-b01-i30-01.json
+
+  common-build-test:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DAXTUAL_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --config Debug
+      - name: Test
+        run: ctest --test-dir build -C Debug --output-on-failure
+
