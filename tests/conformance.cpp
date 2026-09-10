@@ -228,9 +228,19 @@ std::vector<TestCase> testCases() {
 }
 
 std::string executionEnvironment() {
+#if defined(_WIN32)
+    char* runnerOs = nullptr;
+    std::size_t runnerOsLength = 0;
+    if (_dupenv_s(&runnerOs, &runnerOsLength, "RUNNER_OS") == 0 && runnerOs != nullptr) {
+        std::string result(runnerOs, runnerOsLength > 0 ? runnerOsLength - 1 : 0);
+        std::free(runnerOs);
+        return result + ":github-actions";
+    }
+#else
     if (const char* runnerOs = std::getenv("RUNNER_OS"); runnerOs != nullptr) {
         return std::string(runnerOs) + ":github-actions";
     }
+#endif
 #if defined(_WIN32)
     return "Windows:developer-host";
 #elif defined(__APPLE__)
